@@ -1,35 +1,50 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+export const runtime = "nodejs";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any });
+import { NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabaseServer";
+
+// GET /api/projects/[id]
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  if (!id || id.includes("[")) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const supabase = await supabaseServer();
 
   const { data, error } = await supabase
     .from("projects")
     .select("id,name,description,status,created_at")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
   return NextResponse.json({ project: data });
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any });
+// PATCH /api/projects/[id]
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  if (!id || id.includes("[")) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const supabase = await supabaseServer();
+
+  // auth check (navíc k RLS)
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const updates: any = {};
-  if (typeof body.name === "string") updates.name = body.name.trim();
-  if (typeof body.description === "string") updates.description = body.description.trim();
-  if (typeof body.status === "string") updates.status = body.status;
+  const updates: Record<string, any> = {};
+  if ("name" in body) updates.name = body.name?.trim();
+  if ("description" in body) updates.description = body.description?.trim() ?? null;
+  if ("status" in body) updates.status = body.status;
 
   const { data, error } = await supabase
     .from("projects")
     .update(updates)
-    .eq("id", params.id)
+    .eq("id", id)
     .select("id,name,description,status,created_at")
     .single();
 
@@ -37,11 +52,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return NextResponse.json({ project: data });
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any });
+// DELETE /api/projects/[id]
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  if (!id || id.includes("[")) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
 
-  const { error } = await supabase.from("projects").delete().eq("id", params.id);
+  const supabase = await supabaseServer();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { error } = await supabase.from("projects").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }

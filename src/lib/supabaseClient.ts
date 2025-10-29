@@ -10,5 +10,11 @@ export const supabaseBrowser = () =>
 export const supabaseServer = () =>
   createClient(url, anon, { auth: { persistSession: false } });
 
-export const supabaseAdmin = () =>
-  createClient(url, service, { auth: { persistSession: false } }); // server-only (Route Handlers)
+export const supabaseAdmin = () => {
+  if (typeof window !== "undefined") {
+    throw new Error("supabaseAdmin() can run only on server");
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const service = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, service, { auth: { persistSession: false } });
+};

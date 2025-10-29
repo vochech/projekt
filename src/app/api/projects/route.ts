@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+export const runtime = "nodejs";
 
+import { NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabaseServer";
+
+/** GET /api/projects → list mých projektů */
 export async function GET() {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any });
+  const supabase = await supabaseServer();
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -17,15 +19,17 @@ export async function GET() {
   return NextResponse.json({ projects: data ?? [] });
 }
 
+/** POST /api/projects → vytvoření projektu */
 export async function POST(req: Request) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any });
+  const supabase = await supabaseServer();
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const name = (body?.name ?? "").trim();
   const description = (body?.description ?? "").trim();
+
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
   const { data, error } = await supabase
